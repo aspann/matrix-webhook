@@ -1,10 +1,19 @@
 # Changelog
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### [v3.3.0-r1] - 2022-07-22
+
+#### Added
+
+- e2e encryption
+- automatic room-join on invite or firs sync
+- persistent (matrix-nio) session storage (underneath CWD/PWD)
 
 ## [v3.3.0] - 2022-03-04
 
@@ -59,9 +68,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   by [@nim65s](https://github.com/nim65s)
 
 ## [v2.0.0] - 2020-03-14
+
 - Update to matrix-nio & aiohttp & markdown
 
 ## [v1.0.0] - 2020-02-14
+
 - First release with matrix-client & http.server
 
 [Unreleased]: https://github.com/nim65s/matrix-webhook/compare/v3.3.0...master

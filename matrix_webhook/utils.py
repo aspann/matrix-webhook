@@ -7,14 +7,14 @@ from aiohttp import web
 from nio.exceptions import LocalProtocolError
 from nio.responses import RoomSendError
 
-from . import conf, encrypted_client
+from . import conf, enc_client
 
 ERROR_MAP = {
     "M_FORBIDDEN": HTTPStatus.FORBIDDEN,
     "M_CONSENT_NOT_GIVEN": HTTPStatus.FORBIDDEN,
 }
 LOGGER = logging.getLogger("matrix_webhook.utils")
-CLIENT = encrypted_client.AsyncEncClient(conf.MATRIX_URL, conf.MATRIX_ID)
+CLIENT = enc_client.AsyncEncClient(conf.MATRIX_URL, conf.MATRIX_ID)
 
 def error_map(resp):
     """Map response errors to HTTP status."""

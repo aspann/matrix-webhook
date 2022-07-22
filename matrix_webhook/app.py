@@ -5,10 +5,9 @@ import logging
 
 from signal import SIGINT, SIGTERM
 from aiohttp import web
-from . import conf, handler, utils, encrypted_client
+from . import conf, handler, utils, enc_client
 
 LOGGER = logging.getLogger("matrix_webhook.app")
-
 
 async def main(event):
     """
@@ -20,19 +19,25 @@ async def main(event):
     
     server = web.Server(handler.matrix_webhook)
     runner = web.ServerRunner(server)
-    await runner.setup();
+    await runner.setup()
 
-    LOGGER.info(f"Binding on {conf.SERVER_ADDRESS=}")
     site = web.TCPSite(runner, *conf.SERVER_ADDRESS)
-    await site.start();
+    LOGGER.info(f"Binding on {conf.SERVER_ADDRESS=}")
+    await site.start()
 
-    task_a = asyncio.create_task(encrypted_client.run(utils.CLIENT))
-    task_b = asyncio.create_task(event.wait())
-
-    await asyncio.gather(
-        task_a,
-        task_b
+    # new task routine, as we now have two background tasks 
+    # (end of execution if one is complete, mostly sigterm/kill)
+    done, pending = await asyncio.wait(
+        [ 
+            asyncio.create_task(enc_client.run(utils.CLIENT)), 
+            asyncio.create_task(event.wait()) 
+        ], 
+        return_when=asyncio.FIRST_COMPLETED
     )
+    for task in pending:
+        task.cancel()
+    await asyncio.wait(pending)
+
 
     # Cleanup
     await runner.cleanup()
