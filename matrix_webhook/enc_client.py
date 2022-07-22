@@ -9,10 +9,15 @@ import sys
 from nio import (
     AsyncClient,
     ClientConfig,
-    LoginResponse,
     InviteEvent,
+    KeyVerificationCancel,
+    KeyVerificationEvent,
+    KeyVerificationKey,
+    KeyVerificationMac,
+    KeyVerificationStart,
+    LoginResponse,
     MatrixRoom,
-    RoomMemberEvent
+    RoomMemberEvent,
 )
 from nio.store.database import DefaultStore
 from typing import Optional
@@ -53,6 +58,7 @@ class AsyncEncClient(AsyncClient):
 
         self.add_event_callback(self.autojoin_room, InviteEvent)
         self.add_event_callback(self.room_member_changed, RoomMemberEvent)
+        self.add_event_callback(self.key_verification, KeyVerificationEvent)
 
 
     async def login(self) -> None:
@@ -98,22 +104,43 @@ class AsyncEncClient(AsyncClient):
 
     async def autojoin_room(self, room: MatrixRoom, event: InviteEvent):
         await self.join(room.room_id)
-        room = self.rooms[room.room_id]
         LOGGER.debug(f"Room {room.name} is encrypted: {room.encrypted}")
-        ## if invited avter sync was already done
+        ## if invited after sync was already done
         for user in room.users:
             self.trust_devices(user)
 
     async def room_member_changed(self, room: MatrixRoom, event: RoomMemberEvent):
         LOGGER.info(f"RoomMemberEvent: {event.state_key}: {event.membership}")
         if event.membership == "join":
-            for user in room.users:
-                self.trust_devices(user)
+            self.trust_devices(event.state_key)
 
     async def join_room(self, room_id: str):
         await self.join(room_id)
         room = self.rooms[room_id]
         LOGGER.debug(f"Room {room.name} is encrypted: {room.encrypted}")
+
+    # TODO: WIP (not working as expected)
+    async def key_verification(self, room: MatrixRoom, event: KeyVerificationEvent):
+        LOGGER.info(f"KeyVerificationEvent: {event}")
+        try:
+            if isinstance(event, KeyVerificationStart): # 1.
+                LOGGER.debug("KeyVerificationStart")
+                return
+            elif isinstance(event, KeyVerificationKey): # 2.
+                LOGGER.debug("KeyVerificationKey")
+                return
+            elif isinstance(event, KeyVerificationMac): # 3.
+                LOGGER.debug("KeyVerificationMac")
+                return
+            elif isinstance(event, KeyVerificationCancel): # anytime
+                LOGGER.debug("KeyVerificationCancel")
+                return
+            else: # cancel/unknown
+                LOGGER.debug("Unknown KeyVerification")
+                return
+        except:
+            LOGGER.error("An error occured during key verification!")
+
 
     @staticmethod
     def __write_details_to_disk(resp: LoginResponse) -> None:
@@ -129,6 +156,9 @@ async def run(self) -> None:
 
     async def after_first_sync():
         await self.synced.wait()
+        # check if it's needed to upload our keys
+        if self.should_upload_keys:
+            await self.keys_upload()
         # trusting all users in all rooms (incl. all devices)
         for room in self.rooms:
             if not self.rooms[room].users:

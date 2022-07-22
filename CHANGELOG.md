@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Added
 
 - e2e encryption
-- automatic room-join on invite or firs sync
+- automatic room-join on invite or first sync
 - persistent (matrix-nio) session storage (underneath CWD/PWD)
 
 ## [v3.3.0] - 2022-03-04
