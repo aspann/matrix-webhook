@@ -76,10 +76,11 @@ async def matrix_webhook(request):
     else:
         formatted_body = markdown(str(data["body"]), extensions=["extra"])
 
-    # try to join room first -> non none response means error
-    resp = await utils.join_room(data["room_id"])
-    if resp is not None:
-        return resp
+    # TODO obsolete as we join a room directly after invite. (maybe use this as a rejoin)
+    # try to join room first -> non none response means error 
+    #resp = await utils.join_room(data["room_id"])
+    #if resp is not None:
+    #    return resp
 
     content = {
         "msgtype": "m.text",
