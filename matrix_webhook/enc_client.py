@@ -6,15 +6,23 @@ import json
 import os
 import sys
 
-from nio import AsyncClient, ClientConfig, LoginResponse, InviteEvent, MatrixRoom
+from nio import (
+    AsyncClient,
+    ClientConfig,
+    LoginResponse,
+    InviteEvent,
+    MatrixRoom,
+    RoomMemberEvent
+)
 from nio.store.database import DefaultStore
-from typing import Optional, Type
+from typing import Optional
 from . import conf
 
 SESSION_DETAILS_FILE = "creds.json"
-LOGGER = logging.getLogger("matrix_webhook.encrypted_client")
+LOGGER = logging.getLogger("matrix_webhook.enc_client")
 
 class AsyncEncClient(AsyncClient):
+    verified_devices=[]
     def __init__(
         self,
         homeserver,
@@ -44,6 +52,7 @@ class AsyncEncClient(AsyncClient):
             os.mkdir(store_path)
 
         self.add_event_callback(self.autojoin_room, InviteEvent)
+        self.add_event_callback(self.room_member_changed, RoomMemberEvent)
 
 
     async def login(self) -> None:
@@ -58,7 +67,7 @@ class AsyncEncClient(AsyncClient):
                     self.device_id = config["device_id"]
 
                     self.load_store()
-                    LOGGER.debug(f"Logged in using stored credentials: {self.user_id} on {self.device_id}")
+                    LOGGER.info(f"Logged in using stored credentials: {self.user_id} on {self.device_id}")
 
             except IOError as err:
                 LOGGER.error(f"Couldn't load session from file. Logging in. Error: {err}")
@@ -69,7 +78,7 @@ class AsyncEncClient(AsyncClient):
             resp = await super().login(conf.MATRIX_PW)
 
             if isinstance(resp, LoginResponse):
-                LOGGER.debug("Logged in using a password; saving details to disk")
+                LOGGER.info("Logged in using a password; saving details to disk")
                 self.__write_details_to_disk(resp)
             else:
                 LOGGER.warning(f"Failed to log in: {resp}")
@@ -78,16 +87,28 @@ class AsyncEncClient(AsyncClient):
     def trust_devices(self, user_id: str, device_list: Optional[str] = None) -> None:
         for device_id, olm_device in self.device_store[user_id].items():
             if (device_list and device_id not in device_list) or \
-                (user_id == self.user_id and device_id == self.device_id):
+                (user_id == self.user_id and device_id == self.device_id) or \
+                (user_id + device_id in self.verified_devices):
+                LOGGER.debug(f"Device {device_id} from user {user_id} already trusted")
                 continue
 
             self.verify_device(olm_device)
+            self.verified_devices.append(user_id + device_id)
             LOGGER.debug(f"Trusting {device_id} from user {user_id}")
 
     async def autojoin_room(self, room: MatrixRoom, event: InviteEvent):
         await self.join(room.room_id)
         room = self.rooms[room.room_id]
         LOGGER.debug(f"Room {room.name} is encrypted: {room.encrypted}")
+        ## if invited avter sync was already done
+        for user in room.users:
+            self.trust_devices(user)
+
+    async def room_member_changed(self, room: MatrixRoom, event: RoomMemberEvent):
+        LOGGER.info(f"RoomMemberEvent: {event.state_key}: {event.membership}")
+        if event.membership == "join":
+            for user in room.users:
+                self.trust_devices(user)
 
     async def join_room(self, room_id: str):
         await self.join(room_id)
@@ -108,8 +129,7 @@ async def run(self) -> None:
 
     async def after_first_sync():
         await self.synced.wait()
-        # trusting all users in room (incl. all devices)
-        self.trust_devices(conf.MATRIX_ID)
+        # trusting all users in all rooms (incl. all devices)
         for room in self.rooms:
             if not self.rooms[room].users:
                 LOGGER.error(f"No users in room: {room.name}")
