@@ -16,6 +16,42 @@ def grafana(data, headers):
     data["body"] = text
     return data
 
+def grafana9(data, headers):
+    """Pretty-print a grafana 9.x notification. (awsome!)"""
+    text = ""
+    ## fancy-emoji prefix (TODO: make configurable!)
+    if data["state"] == "alerting":
+        pre_icon="💔"
+    #elif data["state"] == "resolved":
+    #    pre_icon="💚"
+    elif data["state"] == "nodata":
+        pre_icon="❌"
+    else:
+        pre_icon="💚"
+
+    # parsing/setting title
+    if "title" in data:
+        text = "####" + pre_icon + " " \
+            + data["title"] + " " + pre_icon + "\n"
+        m = re.search("\((.*?)\)", data["title"])
+        if m:
+            titl = m.group(0)
+            if len(titl) > 2:
+                text = "####" + pre_icon + " " + \
+                titl[1:len(titl)-1:1] + \
+                " " + pre_icon + "\n"
+
+    # default message (body)
+    if "message" in data:
+        # something = json.loads(data["message"].decode())
+        text = text + "```md\n" + data["message"] + "\n```" + "\n\n"
+
+    #  pretty sure we should NOT use this
+    #if "evalMatches" in data:
+    #    for match in data["evalMatches"]:
+    #        text = text + "* " + match["metric"] + ": " + str(match["value"]) + "\n"
+    data["body"] = text
+    return data
 
 def github(data, headers):
     """Pretty-print a github notification."""
